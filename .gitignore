@@ -1,0 +1,50 @@
+# Secrets
+.env
+.env.local
+*.env
+
+# Output (generated variants) — keep output.json as required deliverable
+output_*.json
+!output.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+
+# Testing / caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+pytest_cache/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+temp_*.py
+debug_*.py

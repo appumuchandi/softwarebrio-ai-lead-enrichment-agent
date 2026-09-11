@@ -1,0 +1,54 @@
+[
+  {
+    "domain": "postman.com",
+    "company_overview": "Postman is an API platform for building and using APIs. Postman simplifies each step of the API lifecycle and streamlines collaboration so you can create better APIs—faster.",
+    "target_audience_icp": "Developers and engineering teams",
+    "contact_emails": [],
+    "leadership": [],
+    "linkedin_urls": [],
+    "source_pages": [
+      "https://postman.com/pricing",
+      "https://postman.com/team",
+      "https://postman.com/about",
+      "https://postman.com/"
+    ],
+    "confidence_score": 0.7,
+    "errors": []
+  },
+  {
+    "domain": "supabase.com",
+    "company_overview": "Supabase is a Postgres development platform that adds authentication, real-time, storage, restful APIs, and edge functions to Postgres. It is built by developers for developers and is designed to help developers build scalable and secure applications.",
+    "target_audience_icp": "Developers and engineering teams",
+    "contact_emails": [],
+    "leadership": [],
+    "linkedin_urls": [],
+    "source_pages": [
+      "https://supabase.com/blog/pricing",
+      "https://supabase.com/careers",
+      "https://supabase.com/"
+    ],
+    "confidence_score": 0.65,
+    "errors": [
+      "https://supabase.com/about: HTTP 404 for https://supabase.com/about",
+      "https://supabase.com/about-us: HTTP 404 for https://supabase.com/about-us"
+    ]
+  },
+  {
+    "domain": "vapi.ai",
+    "company_overview": "Vapi is a platform that enables businesses to build advanced voice AI agents. It provides a unified platform for all voice agents, with orchestration, real-time monitoring, and enterprise-grade configurability. Vapi handles the infrastructure, allowing businesses to go from prompt to production fast.",
+    "target_audience_icp": "Enterprises",
+    "contact_emails": [],
+    "leadership": [],
+    "linkedin_urls": [],
+    "source_pages": [
+      "https://vapi.ai/",
+      "https://vapi.ai/careers",
+      "https://vapi.ai/pricing"
+    ],
+    "confidence_score": 0.65,
+    "errors": [
+      "https://vapi.ai/about: HTTP 404 for https://vapi.ai/about",
+      "https://vapi.ai/about-us: HTTP 404 for https://vapi.ai/about-us"
+    ]
+  }
+]
