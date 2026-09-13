@@ -196,13 +196,9 @@ def _ground_leadership(
                 # Check if any grounded linkedin contains member name? No — just drop linkedin
                 grounded_linkedin = None
 
-        # Build grounded member (preserve name, use grounded role/linkedin, keep source_url if in fetched set)
-        # source_url handling: if member.source_url not in fetched_set, null it
-        fetched_set = set(pages_markdown.keys())
-        member_source = member.source_url
-        if member_source and str(member_source).rstrip("/") not in {k.rstrip("/") for k in fetched_set} and str(member_source) not in fetched_set:
-            member_source = None
-
+        # Source attribution: record the exact fetched page where the
+        # leadership member was grounded.
+        member_source = found_page
         grounded.append(
             LeadershipMember(
                 name=name,

@@ -210,7 +210,7 @@ python -m pytest tests/ -q
 python -m pytest tests/test_resilience.py -v
 ```
 
-**Currently verified: 47 passed** (no failures)
+**Currently verified: 81 passed** (no failures)
 
 - `test_cleaner` (5) — no raw HTML, headings/links preserved, truncates
 - `test_discovery` (4) — same-domain priority, sitemap fallback, scoring
@@ -219,6 +219,9 @@ python -m pytest tests/test_resilience.py -v
 - `test_models` (5) — `default_factory`, `EmailStr` generic filter, `confidence 0–1`, domain normalization
 - `test_orchestrator` (4) — fail-soft per URL/domain, `domcontentloaded` not `networkidle`, `output.json` validates
 - `test_resilience` (14) — 404, timeout, 403/bot, 429, 5xx, empty page, DNS/browser crash, sitemap, malformed JSON, LLM 429/timeout, failed domain while others succeed, missing fields, validation failure
+- `test_linkedin_discovery` (25) — valid result, no result, unrelated, timeout, HTTP failure, malformed, duplicate prevention, max 5 limit, existing linkedin skip, fail-soft domain, never-invent, verification, linkedin_urls consistency
+- `test_browser_reuse` (5) — one Browser launch, shared contexts, fail-soft with shared browser, cleanup
+- `test_icp_extraction` (4) — ICP cues, evidence, null handling
 
 ## Sample Results
 
@@ -240,10 +243,26 @@ Reviewer can reproduce offline:
 pip install -r requirements.txt
 playwright install chromium
 python -m scripts.run --mock --input domains.txt --output output.json
-python -m pytest tests/ -q   # 47 passed
+python -m pytest tests/ -q   # 81 passed
 ```
 
 Live LLM (verified): `LLM_PROVIDER=openai` with `OPENAI_API_KEY` (`gpt-4o-mini`) or **NVIDIA OpenAI-compatible** `OPENAI_API_KEY=nvapi-... OPENAI_BASE_URL=https://integrate.api.nvidia.com/v1 OPENAI_MODEL=meta/llama-3.2-11b-vision-instruct` (used for Slice 2–3B verification, requires `MAX_TOTAL_MD_CHARS=15000`/`MAX_MD_CHARS_PER_PAGE=9000` to avoid hang on 30k prompt). Both use same `AsyncOpenAI` path; results vary by model but schema/grounding/resilience remain identical.
+
+## Bonus — DuckDuckGo LinkedIn Discovery (Optional)
+
+External LinkedIn discovery enriches **grounded** leadership members missing `linkedin_url` via DuckDuckGo public web search — no paid API/key.
+
+- **Trigger**: Only after deterministic evidence grounding, for leadership records with valid grounded `name` + `company/domain` where `linkedin_url` is still `null`.
+- **Search**: Query `"<person name>" "<company name>" LinkedIn` (company defaults to domain base, e.g., `postman.com` → `Postman`) against `https://html.duckduckgo.com/html/?q=...` via `httpx` (uses existing project HTTP patterns, `httpx` timeout 10s).
+- **Inspect**: Parses HTML for `linkedin.com/in/` profile URLs only (prefers `/in/` over `/company/`). Only URLs that **actually appear** in DuckDuckGo results are considered; URLs are never invented.
+- **Verify**: Before assignment, the surrounding result title/snippet is checked for plausible association: exact name tokens (and any reordering/hyphenation in slug) plus at least one company token must appear in context. If uncertain, leaves `linkedin` as `null`.
+- **Enrichment**: `src/discovery/linkedin.py:discover_linkedin_profile(name: str, company: str, domain: str) -> str | None` (sync + async variant) + `enrich_leadership_with_linkedin(enrichment, domain)` which updates `leadership[].linkedin_url` and keeps top-level `linkedin_urls` deduped and consistent.
+- **Limits**: Max **5** DuckDuckGo searches per domain per run, deduplicates same person (case-insensitive), skips members who already have `linkedin_url`, bounded timeout, no extra crawling.
+- **Resilience**: Fail-soft — search timeout, HTTP error, DuckDuckGo blocking/captcha, malformed HTML, or no verified LinkedIn result all return `None` and **never crash** the domain pipeline; domain still yields valid `CompanyEnrichment` with `linkedin` as `null`.
+- **No replacement**: Existing website-grounded `linkedin_url` values are never overwritten; external search is enrichment only, not a replacement for authoritative website evidence.
+- **No key required**: Free public DuckDuckGo HTML search; respects timeout and best-effort semantics.
+
+Output schema unchanged; if verified, `leadership[].linkedin_url = "https://www.linkedin.com/in/..."` and `linkedin_urls` includes it, else remains `null`/`[]`.
 
 ## 40% Manual Operations
 

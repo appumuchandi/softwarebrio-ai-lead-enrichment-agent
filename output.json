@@ -1,15 +1,24 @@
 [
   {
     "domain": "postman.com",
-    "company_overview": "Postman is an API platform for building and using APIs. Postman simplifies each step of the API lifecycle and streamlines collaboration so you can create better APIs—faster.",
+    "company_overview": "Postman is an API platform for building and using APIs. It simplifies each step of the API lifecycle and streamlines collaboration so you can create better APIs—faster.",
     "target_audience_icp": "Developers and engineering teams",
-    "contact_emails": [],
-    "leadership": [],
+    "contact_emails": [
+      "info@postman.com"
+    ],
+    "leadership": [
+      {
+        "name": "Abhinav Asthana",
+        "role": "CEO and Co-Founder",
+        "linkedin_url": null,
+        "source_url": "https://postman.com/about"
+      }
+    ],
     "linkedin_urls": [],
     "source_pages": [
-      "https://postman.com/pricing",
       "https://postman.com/team",
       "https://postman.com/about",
+      "https://postman.com/about-us",
       "https://postman.com/"
     ],
     "confidence_score": 0.7,
@@ -17,7 +26,7 @@
   },
   {
     "domain": "supabase.com",
-    "company_overview": "Supabase is a Postgres development platform that adds authentication, real-time, storage, restful APIs, and edge functions to Postgres. It is built by developers for developers and is designed to help developers build scalable and secure applications.",
+    "company_overview": "Supabase is a Postgres development platform that provides a suite of tools for building scalable and secure applications. It offers a dedicated Postgres database, authentication, data APIs, edge functions, realtime data, storage, and vector embeddings. Supabase aims to help developers build applications quickly and efficiently, with a focus on ease of use and scalability.",
     "target_audience_icp": "Developers and engineering teams",
     "contact_emails": [],
     "leadership": [],
@@ -27,7 +36,7 @@
       "https://supabase.com/careers",
       "https://supabase.com/"
     ],
-    "confidence_score": 0.65,
+    "confidence_score": 0.4,
     "errors": [
       "https://supabase.com/about: HTTP 404 for https://supabase.com/about",
       "https://supabase.com/about-us: HTTP 404 for https://supabase.com/about-us"
@@ -35,15 +44,15 @@
   },
   {
     "domain": "vapi.ai",
-    "company_overview": "Vapi is a platform that enables businesses to build advanced voice AI agents. It provides a unified platform for all voice agents, with orchestration, real-time monitoring, and enterprise-grade configurability. Vapi handles the infrastructure, allowing businesses to go from prompt to production fast.",
-    "target_audience_icp": "Enterprises",
+    "company_overview": "Vapi is a company that provides a platform for building advanced voice AI agents. It offers a unified platform for all voice agents, with orchestration, real-time monitoring, and enterprise-grade configurability. The platform allows users to build, test, and deploy voice agents in minutes, and track what's working across every call to continuously improve the experiences that drive their business forward.",
+    "target_audience_icp": "Enterprises and businesses that require advanced voice AI solutions",
     "contact_emails": [],
     "leadership": [],
     "linkedin_urls": [],
     "source_pages": [
       "https://vapi.ai/",
-      "https://vapi.ai/careers",
-      "https://vapi.ai/pricing"
+      "https://vapi.ai/pricing",
+      "https://vapi.ai/careers"
     ],
     "confidence_score": 0.65,
     "errors": [

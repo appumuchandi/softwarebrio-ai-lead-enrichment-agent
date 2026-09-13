@@ -221,3 +221,22 @@ def test_source_pages_not_fabricated_after_grounding():
     os.environ.pop("LLM_PROVIDER", None)
     os.environ.pop("OPENAI_API_KEY", None)
     cfg.reset_settings()
+
+
+def test_grounded_leadership_source_url_uses_found_page():
+    """Regression: grounded member with LLM source_url=None should be attributed to found_page."""
+    pages = {
+        "https://postman.com/team": "## Leadership\nAbhinav Asthana - CEO and Co-Founder\nOur team includes Abhinav Asthana as CEO.",
+        "https://postman.com/": "# Postman\nWe build APIs.",
+    }
+    leadership = [
+        LeadershipMember(name="Abhinav Asthana", role="CEO and Co-Founder", linkedin_url=None, source_url=None),
+    ]
+    grounded, removed = _ground_leadership(leadership, pages)
+    assert len(grounded) == 1
+    assert len(removed) == 0
+    # Must be attributed to the exact fetched page where name was grounded
+    assert str(grounded[0].source_url) == "https://postman.com/team"
+    # Also ensure not null and is HttpUrl-grounded, not LLM-provided
+    assert grounded[0].source_url is not None
+    assert "postman.com/team" in str(grounded[0].source_url)

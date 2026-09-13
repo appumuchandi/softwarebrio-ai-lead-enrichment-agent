@@ -124,6 +124,19 @@ async def enrich_one_domain(domain: str) -> CompanyEnrichment:
 
     enrichment = await extract(domain=domain, pages_markdown=pages_markdown, errors=errors)
 
+    # Bonus: DuckDuckGo-based external LinkedIn discovery for grounded leadership with missing linkedin_url
+    # AFTER deterministic evidence grounding. Fill linkedin_url only if verified in search results.
+    # Fail-soft, bounded (max 5 per domain), never invents URL, never crashes pipeline.
+    try:
+        from src.discovery.linkedin import enrich_leadership_with_linkedin
+
+        # Use domain base as company name for query (e.g., postman.com -> Postman)
+        # If enrichment has company_overview we could derive, but domain is authoritative fallback
+        await enrich_leadership_with_linkedin(enrichment, domain)
+    except Exception:
+        # External search failure must never crash domain enrichment
+        pass
+
     # Evidence-aware: if extractor didn't set source_pages correctly, ensure it's grounded in what we fetched
     # (extractor already does this, but double-ensure here)
     if not enrichment.source_pages and successful_urls:
