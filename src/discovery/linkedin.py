@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from typing import Optional
+from urllib.parse import unquote
 
 import httpx
 
@@ -35,6 +36,15 @@ _LINKEDIN_IN_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Broader pattern to capture bare www.linkedin.com/in/ and http variants (for DDG text/content)
+_LINKEDIN_BARE_RE = re.compile(
+    r"(?:https?://)?(?:www\.)?linkedin\.com/in/[^\s\"'<>\)\]\?&]+",
+    re.IGNORECASE,
+)
+
+# DuckDuckGo redirect parameter containing URL-encoded target
+_UDDG_RE = re.compile(r"uddg=([^&\"'<>]+)", re.IGNORECASE)
+
 # Generic fallback to detect any linkedin URL (used for malformed check)
 _LINKEDIN_ANY_RE = re.compile(
     r"https?://(?:www\.)?linkedin\.com/[^\s\"'<>\)\]]+",
@@ -43,22 +53,36 @@ _LINKEDIN_ANY_RE = re.compile(
 
 
 def _clean_linkedin_url(raw: str) -> str:
-    """Normalize LinkedIn URL: strip trailing punctuation, ensure https, remove tracking params."""
+    """Normalize LinkedIn URL: strip trailing punctuation, ensure https://www.linkedin.com/in/<profile>."""
     url = raw.strip().rstrip(".,;)]\"'")
     # Remove URL parameters/fragment that are tracking artifacts, keep path
     # e.g., https://linkedin.com/in/foo?trk=... -> https://www.linkedin.com/in/foo
-    # Keep query if needed? For profile, query is not needed; strip.
     url = url.split("?")[0].split("#")[0].rstrip("/")
-    # Ensure scheme is https
-    if url.startswith("http://"):
+    # Handle protocol-relative //www.linkedin.com/...
+    if url.startswith("//"):
+        url = "https:" + url
+    # Ensure scheme is https and host is www.linkedin.com
+    if url.lower().startswith("http://"):
         url = "https://" + url[len("http://") :]
-    # Normalize www.
-    if "linkedin.com/in/" in url.lower() and "www." not in url.lower():
-        # keep consistent but accept both; prefer www.
-        # Don't force www if original didn't have it – keep as is for stability
+    elif url.lower().startswith("https://"):
         pass
-    # Ensure prefix is https://www...
-    # We return cleaned but preserve case of path
+    elif url.lower().startswith("www.linkedin.com/"):
+        url = "https://" + url
+    elif url.lower().startswith("linkedin.com/"):
+        url = "https://www." + url
+    # Normalize linkedin.com -> www.linkedin.com
+    # After scheme handling, ensure host is www
+    # e.g., https://linkedin.com/in/foo -> https://www.linkedin.com/in/foo
+    if url.lower().startswith("https://linkedin.com/in/"):
+        url = "https://www.linkedin.com/in/" + url[len("https://linkedin.com/in/") :]
+    elif url.lower().startswith("https://linkedin.com"):
+        # generic fallback for linkedin.com without www (just in case)
+        idx = url.lower().find("linkedin.com")
+        # Preserve path case after domain
+        suffix = url[idx + len("linkedin.com") :]
+        # Ensure suffix starts with /in/ etc.
+        url = "https://www.linkedin.com" + suffix
+    # Preserve case of path but domain normalized to lower; return as is
     return url
 
 
@@ -162,20 +186,39 @@ def _extract_verified_linkedin(html: str, name: str, company: str) -> Optional[s
 
     candidates: list[tuple[str, int, int]] = []
     seen: set[str] = set()
-    for m in _LINKEDIN_IN_RE.finditer(html):
-        raw = m.group(0)
+    # 1) Prefer DuckDuckGo uddg redirect URLs (URL-decoded) — e.g., //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fabhinavasthana
+    for m in _UDDG_RE.finditer(html):
+        encoded = m.group(1)
+        try:
+            decoded = unquote(encoded)
+        except Exception:
+            continue
+        inner = re.search(r"(?:https?://)?(?:www\.)?linkedin\.com/in/[^\s\"'<>\)\]\?&]+", decoded, re.IGNORECASE)
+        if not inner:
+            continue
+        raw = inner.group(0)
         cleaned = _clean_linkedin_url(raw)
-        # Dedupe case-insensitive, normalized slashes
         key = cleaned.lower().rstrip("/")
+        if "/in/" not in key:
+            continue
         if key in seen:
             continue
         seen.add(key)
-        # Extra sanity: ensure linkedin.com/in/ still present after cleaning
-        if "/in/" not in key:
-            continue
         candidates.append((cleaned, m.start(), m.end()))
 
-    # If none with /in/, we do not accept company urls (strict). Return None per spec prefer /in/
+    # 2) Also capture direct/bare linkedin URLs (https://, http://, www.) appearing in HTML text/href
+    for m in _LINKEDIN_BARE_RE.finditer(html):
+        raw = m.group(0)
+        cleaned = _clean_linkedin_url(raw)
+        key = cleaned.lower().rstrip("/")
+        if "/in/" not in key:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append((cleaned, m.start(), m.end()))
+
+    # Strict: only /in/ profile URLs, never company pages
     if not candidates:
         return None
 

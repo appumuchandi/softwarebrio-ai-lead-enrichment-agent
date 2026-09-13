@@ -592,7 +592,7 @@ def test_clean_linkedin_url_normalizes():
     from src.discovery.linkedin import _clean_linkedin_url
     assert _clean_linkedin_url("https://www.linkedin.com/in/janedoe?trk=profile") == "https://www.linkedin.com/in/janedoe"
     assert _clean_linkedin_url("https://www.linkedin.com/in/janedoe/") == "https://www.linkedin.com/in/janedoe"
-    assert _clean_linkedin_url("http://linkedin.com/in/janedoe.,") == "https://linkedin.com/in/janedoe"
+    assert _clean_linkedin_url("http://linkedin.com/in/janedoe.,") == "https://www.linkedin.com/in/janedoe"
     assert _clean_linkedin_url("https://www.linkedin.com/in/jane-doe#section") == "https://www.linkedin.com/in/jane-doe"
 
 
@@ -668,3 +668,142 @@ def test_missing_name_or_company_returns_none():
 async def test_missing_name_or_company_async():
     assert await discover_linkedin_profile_async("", "Example", "example.com") is None
     assert await discover_linkedin_profile_async("Jane Doe", "", "") is None
+
+
+# --- Regression tests for DuckDuckGo parser fix (encoded uddg, bare www, normal https) ---
+
+def test_parser_encoded_uddg_linkedin_url():
+    """Encoded DuckDuckGo uddg redirect must be decoded, normalized, and verified."""
+    # Real DDG snippet: href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fabhinavasthana&rut=..."
+    html = '''
+    <html><body>
+    <div class="result">
+      <a class="result__url" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fabhinavasthana&amp;rut=abc">www.linkedin.com/in/abhinavasthana</a>
+      <a class="result__snippet">CEO and Founder at <b>Postman</b> — View <b>Abhinav Asthana</b>'s profile on LinkedIn.</a>
+    </div>
+    </body></html>
+    '''
+    result = _extract_verified_linkedin(html, "Abhinav Asthana", "Postman")
+    assert result == "https://www.linkedin.com/in/abhinavasthana"
+
+    # Via full discover path (mocked httpx) — sync
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = html
+    mock_client = MagicMock()
+    mock_client.get.return_value = mock_resp
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=None)
+    with patch("src.discovery.linkedin.httpx.Client", return_value=mock_client):
+        url = discover_linkedin_profile("Abhinav Asthana", "Postman", "postman.com")
+        assert url == "https://www.linkedin.com/in/abhinavasthana"
+
+
+def test_parser_bare_www_linkedin_url():
+    """Bare www.linkedin.com/in/... without scheme must be recognized and normalized to https://www..."""
+    html = '''
+    <html><body>
+    <div class="result">
+      <a href="www.linkedin.com/in/janedoe">www.linkedin.com/in/janedoe</a>
+      <span>Jane Doe is CEO at Example — View profile.</span>
+    </div>
+    </body></html>
+    '''
+    result = _extract_verified_linkedin(html, "Jane Doe", "Example")
+    assert result == "https://www.linkedin.com/in/janedoe"
+
+    # Also test bare without www: linkedin.com/in/janedoe
+    html2 = '<html><body><a href="linkedin.com/in/janedoe">linkedin.com/in/janedoe</a> Jane Doe at Example</body></html>'
+    result2 = _extract_verified_linkedin(html2, "Jane Doe", "Example")
+    assert result2 == "https://www.linkedin.com/in/janedoe"
+
+
+def test_parser_normal_https_linkedin_url():
+    """Normal https://www.linkedin.com/in/... must still work and normalize."""
+    html = '''
+    <html><body>
+    <div class="result"><a href="https://www.linkedin.com/in/johndoe">https://www.linkedin.com/in/johndoe</a> John Doe is CTO at Example</div>
+    </body></html>
+    '''
+    result = _extract_verified_linkedin(html, "John Doe", "Example")
+    assert result == "https://www.linkedin.com/in/johndoe"
+
+    # http variant should normalize to https
+    html2 = '<html><body><a href="http://www.linkedin.com/in/janedoe2">http://www.linkedin.com/in/janedoe2</a> Jane Doe2 at Example</body></html>'
+    # Use Jane Doe2 to avoid token mismatch
+    result2 = _extract_verified_linkedin(html2, "Jane Doe2", "Example")
+    assert result2 == "https://www.linkedin.com/in/janedoe2"
+
+    # https://linkedin.com/in/... without www should normalize to www
+    html3 = '<html><body><a href="https://linkedin.com/in/janedoe3">https://linkedin.com/in/janedoe3</a> Jane Doe3 at Example</body></html>'
+    result3 = _extract_verified_linkedin(html3, "Jane Doe3", "Example")
+    assert result3 == "https://www.linkedin.com/in/janedoe3"
+
+
+def test_parser_unrelated_linkedin_rejected_even_with_new_parser():
+    """Even with new parser, unrelated LinkedIn result must be rejected via verification."""
+    # Encoded uddg for John Smith, but searching Jane Doe at Example
+    html = '''
+    <html><body>
+    <div class="result">
+      <a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fjohnsmith">www.linkedin.com/in/johnsmith</a>
+      <span>John Smith is CTO at Example — View profile.</span>
+    </div>
+    </body></html>
+    '''
+    result = _extract_verified_linkedin(html, "Jane Doe", "Example")
+    assert result is None
+
+    # Bare www but wrong person
+    html2 = '<html><body><a href="www.linkedin.com/in/otherperson">www.linkedin.com/in/otherperson</a> Other Person at Example</body></html>'
+    result2 = _extract_verified_linkedin(html2, "Jane Doe", "Example")
+    assert result2 is None
+
+
+def test_parser_verification_still_required():
+    """Exact name + company verification must still be required — never accept merely because URL exists."""
+    # Valid LinkedIn URL present but company token missing in context
+    html = '''
+    <html><body>
+    <div class="result">
+      <a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fjanedoe">www.linkedin.com/in/janedoe</a>
+      <span>Jane Doe is CEO at OtherCorp — View profile.</span>
+    </div>
+    </body></html>
+    '''
+    result = _extract_verified_linkedin(html, "Jane Doe", "Example")
+    assert result is None  # company mismatch -> rejected
+
+    # Name missing in context and also not in slug sufficiently (partial)
+    html2 = '''
+    <html><body>
+    <div class="result">
+      <a href="https://www.linkedin.com/in/janedoe">https://www.linkedin.com/in/janedoe</a>
+      <span>CEO at Example — View profile.</span>
+    </div>
+    </body></html>
+    '''
+    # Context has Example but no Jane Doe tokens; slug does contain janedoe -> our verification allows slug fallback, so this would pass
+    # To test strict failure, use slug that doesn't match name: linkedin.com/in/otherperson but context has Example
+    html3 = '''
+    <html><body>
+    <div class="result">
+      <a href="https://www.linkedin.com/in/otherperson">https://www.linkedin.com/in/otherperson</a>
+      <span>CEO at Example</span>
+    </div>
+    </body></html>
+    '''
+    result3 = _extract_verified_linkedin(html3, "Jane Doe", "Example")
+    assert result3 is None  # name not in context nor slug -> rejected
+
+    # Positive case must still pass
+    html_ok = '''
+    <html><body>
+    <div class="result">
+      <a href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fjanedoe">www.linkedin.com/in/janedoe</a>
+      <span>Jane Doe is CEO at Example — View profile.</span>
+    </div>
+    </body></html>
+    '''
+    result_ok = _extract_verified_linkedin(html_ok, "Jane Doe", "Example")
+    assert result_ok == "https://www.linkedin.com/in/janedoe"
